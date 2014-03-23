@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: taskpool
+Version: 0.1
+Summary: A task pool, execute tasks in the thread pool or the process pool
+Home-page: http://github.com/xgfone/taskpool
+Author: xgfone
+Author-email: xgfone@126.com
+License: BSD
+Description: Reference http://github.com/xgfone/taskpool
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Environment :: Console
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
