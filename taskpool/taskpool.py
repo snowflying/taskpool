@@ -86,18 +86,18 @@ class TaskPool(object):
         self.processor = processor
 
         if pool_type == 't' or pool_type == 'thread':
-            self.task_type = Thread
-            self._queue_type = ThreadQueue
+            self.Processor = Thread
+            self.Queue = ThreadQueue
         elif pool_type == 'p' or pool_type == 'process':
-            self.task_type = Process
-            self._queue_type = ProcessQueue
+            self.Processor = Process
+            self.Queue = ProcessQueue
         else:
             raise ArgError("Do not support {0}".format(pool_type))
 
         self.pools = {}
         self._in_q = self.new_queue(get_task_max_num())
         self.next_task_seq = 1
-        self.pool_lock = ThreadRLock()
+        self._pool_lock = ThreadRLock()
         self._clean = False
 
         # Init the pool
@@ -133,9 +133,9 @@ class TaskPool(object):
     def clean_died_task_processors(self):
         """Clean and recycle the died task processors.
         """
-        self.pool_lock.acquire()
+        self._pool_lock.acquire()
         self._clean_died_task_processors()
-        self.pool_lock.release()
+        self._pool_lock.release()
 
     def new_queue(self, maxsize=0):
         """Create a new queue, and its type is Queue in this module.
@@ -145,7 +145,7 @@ class TaskPool(object):
 
         `maxsize` is the size of the queue. If 0, it is unlimited.
         """
-        return Queue(self._queue_type, maxsize)
+        return Queue(self.Queue, maxsize)
 
     def _spawn_task_seq(self):
         next_seq = self.next_task_seq
@@ -167,29 +167,27 @@ class TaskPool(object):
         if size < 1:
             return
 
-        self.pool_lock.acquire()
+        self._pool_lock.acquire()
         current = self._get_task_processor_state()[0]
         diff = size - current
         if diff != 0:
             self._add_task(diff)
-        self.pool_lock.release()
+        self._pool_lock.release()
 
-    def _callback(self, callback, out_q):
-        rtn = out_q.get()
+    def _callback(self, callback, result):
         if callback:
             try:
-                callback(rtn)
+                callback(result)
             finally:
                 pass
 
     def _add_task(self, num):
         if num >= 0:
             for i in range(num):
-                out_q = self.new_queue()
                 task_seq = self._spawn_task_seq()
-                task = self.task_type(target=self._process,
+                task = self.Processor(target=self._process,
                                       name=str(task_seq),
-                                      args=(task_seq, self._in_q, out_q))
+                                      args=(task_seq, self._in_q))
                 task.daemon = True
                 task.start()
                 self.pools[task_seq] = task
@@ -197,7 +195,7 @@ class TaskPool(object):
             self._terminate_task_pools(0-num)
             self._clean_died_task_processors()
 
-    def _process(self, task_seq, in_q, out_q):
+    def _process(self, task_seq, in_q):
         while True:
             item = in_q.get()
             if item is None or not item[0]:
@@ -212,9 +210,7 @@ class TaskPool(object):
             except Exception as e:
                 rtn = e
 
-            out_q.put(rtn)
-            self._callback(callback, out_q)
-            #in_q.task_done()
+            self._callback(callback, rtn)
 
     def spawn(self, func, *args, **kwargs):
         """Put a task in the task queue.
@@ -262,16 +258,16 @@ class TaskPool(object):
         """
         if timeout:
             time.sleep(timeout)
-            self.pool_lock.acquire()
+            self._pool_lock.acquire()
             for i in self.pools:
                 if self.pools[i].is_alive():
                     return True
-            self.pool_lock.release()
+            self._pool_lock.release()
         else:
-            self.pool_lock.acquire()
+            self._pool_lock.acquire()
             for i in self.pools:
                 self.pools[i].join()
-            self.pool_lock.release()
+            self._pool_lock.release()
         return False
 
     def _get_untreated_task_num(self):
@@ -300,9 +296,9 @@ class TaskPool(object):
         stands for the number of the died processor being unable to continue to
         process the task and it will be recycled in future.
         """
-        self.pool_lock.acquire()
+        self._pool_lock.acquire()
         rtn = self._get_task_processor_state()
-        self.pool_lock.release()
+        self._pool_lock.release()
         return rtn
 
     def _terminate_tasks(self, size=0, timeout=DEFAULT_TIMEOUT):
@@ -365,7 +361,7 @@ class TaskPool(object):
             2. Don't promise that recycle the terminated task processor, since
                it can not terminate some task processor immediately.
         """
-        self.pool_lock.acquire()
+        self._pool_lock.acquire()
         self._terminate_task_pools(size, timeout=timeout)
-        self.pool_lock.release()
+        self._pool_lock.release()
         self.clean_died_task_processors()
